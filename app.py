@@ -7,16 +7,35 @@ def parse_ble_packet(hex_str):
         clean_hex = hex_str.lower().replace("0x", "").replace(" ", "").replace("\n", "")
         data = bytes.fromhex(clean_hex)
         
-        model_map = {
-            0x10: "ARX.AT115", 0x11: "ARX.AT116", 0x20: "ARX.AT125", 0x21: "ARX.AT126",
-            0x30: "ARX.AT145", 0x31: "ARX.AT146", 0x40: "ARX.AT185", 0x41: "ARX.AT186",
-            0x50: "ARX.AT205", 0x60: "ARX.AT435", 0x61: "ARX.AT436", 0x70: "ARX.AT445", 0x71: "ARX.AT446"
+        # 모델명 및 단위 맵핑
+        model_info = {
+            0x10: ("ARX.AT115", "mmH2O"), 0x11: ("ARX.AT116", "mmH2O"),
+            0x20: ("ARX.AT125", "mmH2O"), 0x21: ("ARX.AT126", "mmH2O"),
+            0x30: ("ARX.AT145", "Bar"), 0x31: ("ARX.AT146", "Bar"),
+            0x40: ("ARX.AT185", "mmH2O"), 0x41: ("ARX.AT186", "mmH2O"),
+            0x50: ("ARX.AT205", "℃"), 0x51: ("ARX.AT206", "℃"),
+            0x60: ("ARX.AT435", "m/s2"), 0x61: ("ARX.AT436", "m/s2"),
+            0x70: ("ARX.AT445", "mm/s"), 0x71: ("ARX.AT446", "mm/s")
         }
 
-        def convert_signed_value(b_slice):
+        # 모델 바이트 읽기 (인덱스 5)
+        model_byte = data[5] if len(data) > 5 else 0x00
+        m_name, m_unit = model_info.get(model_byte, (f"Unknown(0x{model_byte:02X})", ""))
+
+        # Value Mask 읽기 (인덱스 10)
+        mask_byte = data[10] if len(data) > 10 else 0x00
+        mask_str = bin(mask_byte & 0x3F)[2:].zfill(6) # 하위 6비트
+
+        def convert_signed_value(b_slice, v_idx):
             if len(b_slice) < 4: return "-"
             val = struct.unpack('<i', b_slice)[0]
-            return f"{val / 100:.2f}"
+            base_val = f"{val / 100:.2f}"
+            
+            # Mask 확인 (mask_str은 "v6 v5 v4 v3 v2 v1" 순서)
+            # v_idx가 1이면 mask_str[-1] 확인
+            if mask_str[-v_idx] == '1':
+                return f"{base_val} {m_unit}"
+            return base_val
 
         results = []
         specs = [
@@ -24,18 +43,18 @@ def parse_ble_packet(hex_str):
             ("manufacture", 1, 2, lambda b: f"{b.hex().upper()} (hex)"),
             ("company", 2, 4, lambda b: f"{b.hex().upper()} (hex)"),
             ("struct ver", 4, 5, lambda b: f"{b.hex().upper()} (hex)"),
-            ("model", 5, 6, lambda b: model_map.get(b[0], f"Unknown(0x{b[0]:02X})")),
+            ("model", 5, 6, lambda b: m_name),
             ("error", 6, 7, lambda b: f"{b.hex().upper()} (hex)"),
             ("error info", 7, 8, lambda b: f"{b.hex().upper()} (hex)"),
             ("mcu temp", 8, 9, lambda b: f"{int(b[0])} °C"),
             ("battery", 9, 10, lambda b: f"{int(b[0])} %"),
-            ("value mask", 10, 11, lambda b: bin(b[0] & 0x3F)[2:].zfill(6)), 
-            ("value 1", 11, 15, convert_signed_value),
-            ("value 2", 15, 19, convert_signed_value),
-            ("value 3", 19, 23, convert_signed_value),
-            ("value 4", 23, 27, convert_signed_value),
-            ("value 5", 27, 31, convert_signed_value),
-            ("value 6", 31, 35, convert_signed_value),
+            ("value mask", 10, 11, lambda b: mask_str), 
+            ("value 1", 11, 15, lambda b: convert_signed_value(b, 1)),
+            ("value 2", 15, 19, lambda b: convert_signed_value(b, 2)),
+            ("value 3", 19, 23, lambda b: convert_signed_value(b, 3)),
+            ("value 4", 23, 27, lambda b: convert_signed_value(b, 4)),
+            ("value 5", 27, 31, lambda b: convert_signed_value(b, 5)),
+            ("value 6", 31, 35, lambda b: convert_signed_value(b, 6)),
         ]
 
         for name, start, end, conv_func in specs:
@@ -49,53 +68,38 @@ def parse_ble_packet(hex_str):
 
         df = pd.DataFrame(results)
         
-        # 1. 스타일링 함수 (전체 행 대상)
+        # 스타일링 함수
         def style_rows(row):
             styles = [''] * len(row)
             name = row['항목']
             raw_val = row['Raw 값']
             
-            # Value Mask 가져오기 (문자열 형태 예: "111111")
-            mask_row = df[df['항목'] == 'value mask']
-            mask_val = mask_row['변환값'].values[0] if not mask_row.empty else "000000"
-            
             is_bold = False
-            
-            # (A) Model, Battery 무조건 Bold
             if name in ['model', 'battery']:
                 is_bold = True
-            
-            # (B) Value Mask 기반 Bold (LSB부터 역순 확인)
             elif name.startswith('value '):
-                try:
-                    num = int(name.split(' ')[1]) # value 1 -> 1
-                    # mask_val이 "000111"일 때 mask_val[-1]은 value 1
-                    if mask_val[-num] == '1':
-                        is_bold = True
-                except: pass
+                num = int(name.split(' ')[1])
+                if mask_str[-num] == '1':
+                    is_bold = True
 
             if is_bold:
-                styles = ['font-weight: 900; background-color: #f0f2f6;'] * len(row)
+                styles = ['font-weight: 900; background-color: #f8f9fa; border: 1px solid #dee2e6;'] * len(row)
 
-            # (C) Error 빨간색 처리 (Bold 유지하면서 색상만 추가)
             if name == 'error' and raw_val != "0x00":
                 styles[2] = (styles[2] if is_bold else '') + ' color: red; font-weight: 900;'
                 
             return styles
 
-        # 스타일 적용 및 좌측 인덱스 제거
         styled_df = df.style.apply(style_rows, axis=1).hide(axis='index')
         
-        # 헤더 스타일 설정 (검은 배경, 흰 글씨)
+        # 헤더 스타일
         styled_df.set_table_styles([
             {'selector': 'th', 'props': [
-                ('background-color', 'black'),
-                ('color', 'white'),
-                ('font-weight', 'bold'),
-                ('text-align', 'center'),
-                ('border', '1px solid white')
+                ('background-color', 'black'), ('color', 'white'),
+                ('font-weight', 'bold'), ('text-align', 'center'),
+                ('border', '1px solid white'), ('padding', '10px')
             ]},
-            {'selector': 'td', 'props': [('border', '1px solid #dee2e6')]}
+            {'selector': 'td', 'props': [('padding', '8px'), ('border', '1px solid #dee2e6')]}
         ])
         
         return styled_df
@@ -114,5 +118,4 @@ if raw_input:
     styled_df = parse_ble_packet(raw_input)
     if styled_df is not None:
         st.write("### 📊 분석 결과")
-        # HTML로 렌더링하여 스타일 보장
         st.write(styled_df.to_html(escape=False), unsafe_allow_html=True)
