@@ -9,7 +9,7 @@ st.set_page_config(page_title="신형 센서 분석기", layout="wide")
 st.markdown("""
     <style>
         .block-container {
-            padding-top: 4rem;
+            padding-top: 3rem;
             padding-bottom: 0rem;
         }
         /* 제목 하단 간격 컴팩트 유지 */
