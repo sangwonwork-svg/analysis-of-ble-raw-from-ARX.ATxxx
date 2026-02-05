@@ -25,7 +25,7 @@ def parse_ble_packet(hex_str):
 
         def convert_signed_value(b_slice, v_idx):
             if len(b_slice) < 4: return "-"
-            val = struct.unpack('<i', b_slice)[0] # Little Endian Signed Int
+            val = struct.unpack('<i', b_slice)[0] 
             base_val = f"{val / 100:.2f}"
             if mask_str[-v_idx] == '1':
                 return f"{base_val} {m_unit}"
@@ -81,23 +81,21 @@ def parse_ble_packet(hex_str):
 
         styled = df.style.apply(apply_styles, axis=1).hide(axis='index')
         
-        # 디자인 수정: 패딩 70% 축소, 타이틀 폰트 절반 크기
         header_css = [
             {'selector': 'th', 'props': [
                 ('background-color', 'black'), ('color', 'white'), 
                 ('font-weight', 'bold'), ('text-align', 'center'), 
                 ('border', '0.5px solid #666666'), 
-                ('padding', '4px 8px'), # 기존 12px에서 대폭 축소
-                ('font-size', '12px')   # 타이틀 폰트 크기 축소
+                ('padding', '4px 8px'), 
+                ('font-size', '11px') # 타이틀 폰트 추가 축소
             ]},
             {'selector': 'td', 'props': [
                 ('border', '0.5px solid #666666'), 
-                ('padding', '4px 8px'), # 기존 12px에서 대폭 축소
-                ('font-size', '13px')
+                ('padding', '4px 8px'), 
+                ('font-size', '12px')
             ]}
         ]
         styled.set_table_styles(header_css)
-        
         return styled
 
     except Exception as e:
@@ -105,15 +103,19 @@ def parse_ble_packet(hex_str):
         return None
 
 # --- UI ---
-st.set_page_config(page_title="BLE Analyzer", layout="wide")
-st.title("📡 BLE Raw Packet Analyzer")
+st.set_page_config(page_title="신형 센서 분석기", layout="wide")
+
+# 메인 타이틀 수정: 아이콘 제거, 문구 변경, 크기 절반 축소
+st.markdown("### 신형 센서 광고 데이터 분석")
 
 raw_input = st.text_input("Raw 패킷 입력 (0x...)", placeholder="0x010203...")
 
 if raw_input:
     styled_df = parse_ble_packet(raw_input)
     if styled_df is not None:
-        st.markdown("### 📊 분석 결과")
+        # 결과 헤더 수정: 문구 변경, 크기 절반 축소 (h5 사용)
+        st.markdown("##### 분석 결과")
+        
         table_html = styled_df.to_html()
         st.markdown(
             f'<style>table {{ border-collapse: collapse; width: 100%; }}</style>{table_html}', 
