@@ -2,12 +2,30 @@ import streamlit as st
 import pandas as pd
 import struct
 
+# --- UI 설정 ---
+st.set_page_config(page_title="신형 센서 분석기", layout="wide")
+
+# 상단 여백 및 타이틀 간격 최소화 CSS
+st.markdown("""
+    <style>
+        /* 메인 콘텐츠 상단 패딩을 기본값의 절반 이하인 0.5rem으로 설정 */
+        .block-container {
+            padding-top: 0.5rem;
+            padding-bottom: 0rem;
+        }
+        /* 제목과 입력창 사이의 간격도 미세하게 조정 */
+        h3 {
+            margin-top: 0rem;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 def parse_ble_packet(hex_str):
     try:
         clean_hex = hex_str.lower().replace("0x", "").replace(" ", "").replace("\n", "")
         data = bytes.fromhex(clean_hex)
         
-        # 모델 정보 및 단위 정의
         model_info = {
             0x10: ("ARX.AT115", "mmH2O"), 0x11: ("ARX.AT116", "mmH2O"),
             0x20: ("ARX.AT125", "mmH2O"), 0x21: ("ARX.AT126", "mmH2O"),
@@ -87,7 +105,7 @@ def parse_ble_packet(hex_str):
                 ('font-weight', 'bold'), ('text-align', 'center'), 
                 ('border', '0.5px solid #666666'), 
                 ('padding', '4px 8px'), 
-                ('font-size', '11px') # 타이틀 폰트 추가 축소
+                ('font-size', '11px')
             ]},
             {'selector': 'td', 'props': [
                 ('border', '0.5px solid #666666'), 
@@ -102,10 +120,7 @@ def parse_ble_packet(hex_str):
         st.error(f"분석 중 오류 발생: {e}")
         return None
 
-# --- UI ---
-st.set_page_config(page_title="신형 센서 분석기", layout="wide")
-
-# 메인 타이틀 수정: 아이콘 제거, 문구 변경, 크기 절반 축소
+# --- Main UI ---
 st.markdown("### 신형 센서 광고 데이터 분석")
 
 raw_input = st.text_input("Raw 패킷 입력 (0x...)", placeholder="0x010203...")
@@ -113,7 +128,6 @@ raw_input = st.text_input("Raw 패킷 입력 (0x...)", placeholder="0x010203..."
 if raw_input:
     styled_df = parse_ble_packet(raw_input)
     if styled_df is not None:
-        # 결과 헤더 수정: 문구 변경, 크기 절반 축소 (h5 사용)
         st.markdown("##### 분석 결과")
         
         table_html = styled_df.to_html()
