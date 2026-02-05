@@ -7,6 +7,7 @@ def parse_ble_packet(hex_str):
         clean_hex = hex_str.lower().replace("0x", "").replace(" ", "").replace("\n", "")
         data = bytes.fromhex(clean_hex)
         
+        # 모델 정보 및 단위 정의
         model_info = {
             0x10: ("ARX.AT115", "mmH2O"), 0x11: ("ARX.AT116", "mmH2O"),
             0x20: ("ARX.AT125", "mmH2O"), 0x21: ("ARX.AT126", "mmH2O"),
@@ -24,7 +25,7 @@ def parse_ble_packet(hex_str):
 
         def convert_signed_value(b_slice, v_idx):
             if len(b_slice) < 4: return "-"
-            val = struct.unpack('<i', b_slice)[0]
+            val = struct.unpack('<i', b_slice)[0] # Little Endian Signed Int
             base_val = f"{val / 100:.2f}"
             if mask_str[-v_idx] == '1':
                 return f"{base_val} {m_unit}"
@@ -65,10 +66,8 @@ def parse_ble_packet(hex_str):
             styles = [''] * len(row)
             name = row['항목']
             raw_val = row['Raw 값']
-            is_bold = False
-            if name in ['model', 'battery']:
-                is_bold = True
-            elif name.startswith('value '):
+            is_bold = (name in ['model', 'battery'])
+            if name.startswith('value '):
                 try:
                     v_num = int(name.split(' ')[1])
                     if mask_str[-v_num] == '1': is_bold = True
@@ -82,17 +81,19 @@ def parse_ble_packet(hex_str):
 
         styled = df.style.apply(apply_styles, axis=1).hide(axis='index')
         
-        # 표 스타일 설정 (선 색상: 짙은 회색 #666666, 높이 30% 증가)
+        # 디자인 수정: 패딩 70% 축소, 타이틀 폰트 절반 크기
         header_css = [
             {'selector': 'th', 'props': [
                 ('background-color', 'black'), ('color', 'white'), 
                 ('font-weight', 'bold'), ('text-align', 'center'), 
-                ('border', '0.5px solid #666666'), ('padding', '12px 15px')
+                ('border', '0.5px solid #666666'), 
+                ('padding', '4px 8px'), # 기존 12px에서 대폭 축소
+                ('font-size', '12px')   # 타이틀 폰트 크기 축소
             ]},
             {'selector': 'td', 'props': [
                 ('border', '0.5px solid #666666'), 
-                ('padding', '12px 15px'),  # 행 높이를 위해 상하 패딩 증가
-                ('font-size', '14px')
+                ('padding', '4px 8px'), # 기존 12px에서 대폭 축소
+                ('font-size', '13px')
             ]}
         ]
         styled.set_table_styles(header_css)
@@ -113,7 +114,6 @@ if raw_input:
     styled_df = parse_ble_packet(raw_input)
     if styled_df is not None:
         st.markdown("### 📊 분석 결과")
-        # HTML 렌더링 시 테두리 붕괴 방지 스타일 추가
         table_html = styled_df.to_html()
         st.markdown(
             f'<style>table {{ border-collapse: collapse; width: 100%; }}</style>{table_html}', 
