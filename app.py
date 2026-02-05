@@ -61,7 +61,6 @@ def parse_ble_packet(hex_str):
 # --- UI ---
 st.set_page_config(page_title="BLE Analyzer", layout="centered")
 st.title("📡 BLE Raw Packet Analyzer")
-st.info("입력된 패킷의 6번째 바이트(Model)를 Hex 값 그대로 읽어 모델명을 매칭합니다.")
 
 raw_input = st.text_input("Raw 패킷 입력 (0x...)", placeholder="0x010203040510...")
 
