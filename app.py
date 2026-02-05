@@ -5,7 +5,7 @@ import struct
 # --- UI 설정 ---
 st.set_page_config(page_title="신형 센서 분석기", layout="wide")
 
-# 상단 여백을 3rem으로 조정 및 타이틀 간격 유지
+# 상단 여백 및 라벨 숨기기 CSS
 st.markdown("""
     <style>
         .block-container {
@@ -15,6 +15,10 @@ st.markdown("""
         h3 {
             margin-top: 0rem;
             margin-bottom: 0.5rem;
+        }
+        /* 입력창 위 라벨(설명 문구) 숨기기 */
+        div[data-testid="stTextInput"] label {
+            display: none;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -122,8 +126,8 @@ def parse_ble_packet(hex_str):
 # --- Main UI ---
 st.markdown("### 신형 센서 광고 데이터 분석")
 
-# 입력창 문구(label)는 남겨두되, 내부 placeholder는 빈 값으로 설정
-raw_input = st.text_input("Raw 패킷 입력 (0x...)", placeholder="")
+# 라벨은 공란으로 두지 않고 CSS로 숨겼으므로, placeholder만 설정합니다.
+raw_input = st.text_input("hidden_label", placeholder="Raw 패킷 입력 (0x...)")
 
 if raw_input:
     styled_df = parse_ble_packet(raw_input)
