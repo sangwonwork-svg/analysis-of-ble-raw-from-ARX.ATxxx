@@ -4,6 +4,7 @@ import struct
 
 def parse_ble_packet(hex_str):
     try:
+        # 데이터 정제
         clean_hex = hex_str.lower().replace("0x", "").replace(" ", "").replace("\n", "")
         data = bytes.fromhex(clean_hex)
         
@@ -18,21 +19,19 @@ def parse_ble_packet(hex_str):
             0x70: ("ARX.AT445", "mm/s"), 0x71: ("ARX.AT446", "mm/s")
         }
 
-        # 모델 바이트 읽기 (인덱스 5)
+        # 모델 정보 추출
         model_byte = data[5] if len(data) > 5 else 0x00
         m_name, m_unit = model_info.get(model_byte, (f"Unknown(0x{model_byte:02X})", ""))
 
-        # Value Mask 읽기 (인덱스 10)
+        # Value Mask 추출 및 안정적인 기본값 설정
         mask_byte = data[10] if len(data) > 10 else 0x00
-        mask_str = bin(mask_byte & 0x3F)[2:].zfill(6) # 하위 6비트
+        mask_str = bin(mask_byte & 0x3F)[2:].zfill(6)
 
         def convert_signed_value(b_slice, v_idx):
             if len(b_slice) < 4: return "-"
             val = struct.unpack('<i', b_slice)[0]
             base_val = f"{val / 100:.2f}"
-            
-            # Mask 확인 (mask_str은 "v6 v5 v4 v3 v2 v1" 순서)
-            # v_idx가 1이면 mask_str[-1] 확인
+            # mask_str의 인덱스는 v1이 가장 오른쪽(-1)
             if mask_str[-v_idx] == '1':
                 return f"{base_val} {m_unit}"
             return base_val
@@ -67,9 +66,9 @@ def parse_ble_packet(hex_str):
                 results.append({"항목": name, "Raw 값": "-", "변환값": "데이터 부족"})
 
         df = pd.DataFrame(results)
-        
-        # 스타일링 함수
-        def style_rows(row):
+
+        # 스타일링 함수 보완
+        def apply_styles(row):
             styles = [''] * len(row)
             name = row['항목']
             raw_val = row['Raw 값']
@@ -78,37 +77,45 @@ def parse_ble_packet(hex_str):
             if name in ['model', 'battery']:
                 is_bold = True
             elif name.startswith('value '):
-                num = int(name.split(' ')[1])
-                if mask_str[-num] == '1':
-                    is_bold = True
+                try:
+                    # 'value 1' -> '1' 추출 안전하게 처리
+                    v_num_str = name.split(' ')[1]
+                    if v_num_str.isdigit():
+                        v_num = int(v_num_str)
+                        if 1 <= v_num <= 6 and mask_str[-v_num] == '1':
+                            is_bold = True
+                except (IndexError, ValueError):
+                    pass
 
             if is_bold:
-                styles = ['font-weight: 900; background-color: #f8f9fa; border: 1px solid #dee2e6;'] * len(row)
-
+                styles = ['font-weight: 900; background-color: #f0f2f6;'] * len(row)
+            
             if name == 'error' and raw_val != "0x00":
                 styles[2] = (styles[2] if is_bold else '') + ' color: red; font-weight: 900;'
                 
             return styles
 
-        styled_df = df.style.apply(style_rows, axis=1).hide(axis='index')
+        # 스타일 적용 및 인덱스 제거
+        styled = df.style.apply(apply_styles, axis=1).hide(axis='index')
         
-        # 헤더 스타일
-        styled_df.set_table_styles([
+        # 헤더 스타일 정의
+        header_css = [
             {'selector': 'th', 'props': [
-                ('background-color', 'black'), ('color', 'white'),
-                ('font-weight', 'bold'), ('text-align', 'center'),
-                ('border', '1px solid white'), ('padding', '10px')
+                ('background-color', 'black'), ('color', 'white'), 
+                ('font-weight', 'bold'), ('text-align', 'center'), 
+                ('border', '1px solid white')
             ]},
-            {'selector': 'td', 'props': [('padding', '8px'), ('border', '1px solid #dee2e6')]}
-        ])
+            {'selector': 'td', 'props': [('border', '1px solid #dee2e6')]}
+        ]
+        styled.set_table_styles(header_css)
         
-        return styled_df
+        return styled
 
     except Exception as e:
-        st.error(f"오류 발생: {e}")
+        st.error(f"분석 중 오류 발생: {e}")
         return None
 
-# --- UI ---
+# --- UI Layout ---
 st.set_page_config(page_title="BLE Analyzer", layout="wide")
 st.title("📡 BLE Raw Packet Analyzer")
 
@@ -117,5 +124,6 @@ raw_input = st.text_input("Raw 패킷 입력 (0x...)", placeholder="0x0102030405
 if raw_input:
     styled_df = parse_ble_packet(raw_input)
     if styled_df is not None:
-        st.write("### 📊 분석 결과")
-        st.write(styled_df.to_html(escape=False), unsafe_allow_html=True)
+        st.markdown("### 📊 분석 결과")
+        # 가장 안정적인 HTML 출력 방식
+        st.html(styled_df.to_html())
