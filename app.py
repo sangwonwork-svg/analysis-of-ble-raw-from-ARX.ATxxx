@@ -8,11 +8,12 @@ def parse_ble_packet(hex_str):
         clean_hex = hex_str.lower().replace("0x", "").replace(" ", "").replace("\n", "")
         data = bytes.fromhex(clean_hex)
         
-        # 모델 맵핑 테이블 (제공된 표 기준)
+        # 모델 맵핑 테이블 (0x10 -> 10으로 매핑하기 위해 16진수 형태 사용)
+        # 패킷의 바이트 값을 그대로 16진수 정수로 비교합니다.
         model_map = {
-            10: "ARX.AT115", 11: "ARX.AT116", 20: "ARX.AT125", 21: "ARX.AT126",
-            30: "ARX.AT145", 31: "ARX.AT146", 40: "ARX.AT185", 41: "ARX.AT186",
-            50: "ARX.AT205", 60: "ARX.AT435", 61: "ARX.AT436", 70: "ARX.AT445", 71: "ARX.AT446"
+            0x10: "ARX.AT115", 0x11: "ARX.AT116", 0x20: "ARX.AT125", 0x21: "ARX.AT126",
+            0x30: "ARX.AT145", 0x31: "ARX.AT146", 0x40: "ARX.AT185", 0x41: "ARX.AT186",
+            0x50: "ARX.AT205", 0x60: "ARX.AT435", 0x61: "ARX.AT436", 0x70: "ARX.AT445", 0x71: "ARX.AT446"
         }
 
         def convert_signed_value(b_slice):
@@ -23,19 +24,18 @@ def parse_ble_packet(hex_str):
 
         results = []
 
-        # 바이트 순서 재설정 (표 기준: 1번 바이트 시작 -> 인덱스는 0부터)
-        # (항목명, 시작_idx, 끝_idx, 변환함수)
+        # 바이트 순서 (표 기준: 1번 바이트 시작 -> 인덱스는 0부터)
         specs = [
             ("length", 0, 1, lambda b: "-"),
             ("manufacture", 1, 2, lambda b: "-"),
             ("company", 2, 4, lambda b: "-"),
             ("struct ver", 4, 5, lambda b: "-"),
-            ("model", 5, 6, lambda b: model_map.get(b[0], f"Unknown({b[0]})")),
+            ("model", 5, 6, lambda b: model_map.get(b[0], f"Unknown(0x{b[0]:02X})")),
             ("error", 6, 7, lambda b: "-"),
             ("error info", 7, 8, lambda b: "-"),
             ("mcu temp", 8, 9, lambda b: f"{int(b[0])} °C"),
             ("battery", 9, 10, lambda b: f"{int(b[0])} %"),
-            ("value mask", 10, 11, lambda b: bin(b[0] & 0x3F)[2:].zfill(6)), # 하위 6bit
+            ("value mask", 10, 11, lambda b: bin(b[0] & 0x3F)[2:].zfill(6)), 
             ("value 1", 11, 15, convert_signed_value),
             ("value 2", 15, 19, convert_signed_value),
             ("value 3", 19, 23, convert_signed_value),
@@ -61,8 +61,9 @@ def parse_ble_packet(hex_str):
 # --- UI ---
 st.set_page_config(page_title="BLE Analyzer", layout="centered")
 st.title("📡 BLE Raw Packet Analyzer")
+st.info("입력된 패킷의 6번째 바이트(Model)를 Hex 값 그대로 읽어 모델명을 매칭합니다.")
 
-raw_input = st.text_input("Raw 패킷 입력 (0x...)", placeholder="0x010203...")
+raw_input = st.text_input("Raw 패킷 입력 (0x...)", placeholder="0x010203040510...")
 
 if raw_input:
     df = parse_ble_packet(raw_input)
