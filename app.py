@@ -5,7 +5,7 @@ import struct
 # --- UI 설정 ---
 st.set_page_config(page_title="신형 센서 분석기", layout="wide")
 
-# 상단 여백 및 라벨 숨기기 CSS
+# 상단 여백, 라벨 숨기기 및 열 넓이 균등 배분 CSS
 st.markdown("""
     <style>
         .block-container {
@@ -16,9 +16,19 @@ st.markdown("""
             margin-top: 0rem;
             margin-bottom: 0.5rem;
         }
-        /* 입력창 위 라벨(설명 문구) 숨기기 */
+        /* 입력창 위 라벨 숨기기 */
         div[data-testid="stTextInput"] label {
             display: none;
+        }
+        /* 표의 모든 열 넓이를 동일하게(33.33%) 설정 */
+        table {
+            table-layout: fixed;
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            width: 33.33%;
+            word-break: break-all;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -126,16 +136,11 @@ def parse_ble_packet(hex_str):
 # --- Main UI ---
 st.markdown("### 신형 센서 광고 데이터 분석")
 
-# 라벨은 공란으로 두지 않고 CSS로 숨겼으므로, placeholder만 설정합니다.
 raw_input = st.text_input("hidden_label", placeholder="Raw 패킷 입력 (0x...)")
 
 if raw_input:
     styled_df = parse_ble_packet(raw_input)
     if styled_df is not None:
-        st.markdown("##### 분석 결과")
-        
+        # "분석 결과" 문구 삭제됨
         table_html = styled_df.to_html()
-        st.markdown(
-            f'<style>table {{ border-collapse: collapse; width: 100%; }}</style>{table_html}', 
-            unsafe_allow_html=True
-        )
+        st.markdown(table_html, unsafe_allow_html=True)
