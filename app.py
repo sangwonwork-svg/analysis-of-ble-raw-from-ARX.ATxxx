@@ -5,14 +5,13 @@ import struct
 # --- UI 설정 ---
 st.set_page_config(page_title="신형 센서 분석기", layout="wide")
 
-# 상단 여백을 기본값의 약 50% 수준으로 조정 (기본 6rem -> 3rem)
+# 상단 여백을 3rem으로 조정 및 타이틀 간격 유지
 st.markdown("""
     <style>
         .block-container {
             padding-top: 3rem;
             padding-bottom: 0rem;
         }
-        /* 제목 하단 간격 컴팩트 유지 */
         h3 {
             margin-top: 0rem;
             margin-bottom: 0.5rem;
@@ -25,6 +24,7 @@ def parse_ble_packet(hex_str):
         clean_hex = hex_str.lower().replace("0x", "").replace(" ", "").replace("\n", "")
         data = bytes.fromhex(clean_hex)
         
+        # 모델 정보 및 단위 정의
         model_info = {
             0x10: ("ARX.AT115", "mmH2O"), 0x11: ("ARX.AT116", "mmH2O"),
             0x20: ("ARX.AT125", "mmH2O"), 0x21: ("ARX.AT126", "mmH2O"),
@@ -122,7 +122,8 @@ def parse_ble_packet(hex_str):
 # --- Main UI ---
 st.markdown("### 신형 센서 광고 데이터 분석")
 
-raw_input = st.text_input("Raw 패킷 입력 (0x...)", placeholder="0x010203...")
+# 입력창 문구(label)는 남겨두되, 내부 placeholder는 빈 값으로 설정
+raw_input = st.text_input("Raw 패킷 입력 (0x...)", placeholder="")
 
 if raw_input:
     styled_df = parse_ble_packet(raw_input)
