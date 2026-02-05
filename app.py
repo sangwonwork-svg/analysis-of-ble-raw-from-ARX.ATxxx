@@ -33,6 +33,19 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- 세션 상태 초기화 (입력 데이터 유지 및 비우기용) ---
+if "last_df" not in st.session_state:
+    st.session_state.last_df = None
+
+def on_input_change():
+    """입력창에 Enter가 입력되었을 때 실행되는 콜백 함수"""
+    raw_val = st.session_state.packet_input
+    if raw_val:
+        # 분석 수행 후 결과를 세션에 저장
+        st.session_state.last_df = parse_ble_packet(raw_val)
+        # 입력창 비우기
+        st.session_state.packet_input = ""
+
 def parse_ble_packet(hex_str):
     try:
         clean_hex = hex_str.lower().replace("0x", "").replace(" ", "").replace("\n", "")
@@ -136,11 +149,15 @@ def parse_ble_packet(hex_str):
 # --- Main UI ---
 st.markdown("### 신형 센서 광고 데이터 분석")
 
-raw_input = st.text_input("hidden_label", placeholder="Raw 패킷 입력 (0x...)")
+# key와 on_change 콜백을 사용하여 Enter 입력 시 텍스트를 지우도록 함
+st.text_input(
+    "label_hidden", 
+    placeholder="Raw 패킷 입력 (0x...)", 
+    key="packet_input", 
+    on_change=on_input_change
+)
 
-if raw_input:
-    styled_df = parse_ble_packet(raw_input)
-    if styled_df is not None:
-        # "분석 결과" 문구 삭제됨
-        table_html = styled_df.to_html()
-        st.markdown(table_html, unsafe_allow_html=True)
+# 세션에 저장된 결과가 있으면 출력
+if st.session_state.last_df is not None:
+    table_html = st.session_state.last_df.to_html()
+    st.markdown(table_html, unsafe_allow_html=True)
