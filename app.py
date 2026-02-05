@@ -49,43 +49,54 @@ def parse_ble_packet(hex_str):
 
         df = pd.DataFrame(results)
         
-        # --- 스타일링 함수 정의 ---
-        def apply_styles(row):
+        # 1. 스타일링 함수 (전체 행 대상)
+        def style_rows(row):
             styles = [''] * len(row)
             name = row['항목']
-            conv_val = str(row['변환값'])
             raw_val = row['Raw 값']
             
-            # 1. Error 값이 0이 아닐 때 빨간색 (Raw 값이 0x00이 아님을 확인)
-            if name == 'error' and raw_val != "0x00":
-                styles[2] = 'color: red; font-weight: bold;'
+            # Value Mask 가져오기 (문자열 형태 예: "111111")
+            mask_row = df[df['항목'] == 'value mask']
+            mask_val = mask_row['변환값'].values[0] if not mask_row.empty else "000000"
             
-            # 2. Model, Battery 행 굵게
+            is_bold = False
+            
+            # (A) Model, Battery 무조건 Bold
             if name in ['model', 'battery']:
-                styles = ['font-weight: bold;'] * len(row)
+                is_bold = True
             
-            # 3. Value Mask 기반 굵게 처리
-            mask_val = df[df['항목'] == 'value mask']['변환값'].values[0] if not df[df['항목'] == 'value mask'].empty else "000000"
-            if name.startswith('value '):
+            # (B) Value Mask 기반 Bold (LSB부터 역순 확인)
+            elif name.startswith('value '):
                 try:
-                    v_idx = int(name.split(' ')[1]) # value 1 -> 1
-                    if mask_val[6 - v_idx] == '1': # Mask의 LSB부터 확인
-                        styles = ['font-weight: bold;'] * len(row)
+                    num = int(name.split(' ')[1]) # value 1 -> 1
+                    # mask_val이 "000111"일 때 mask_val[-1]은 value 1
+                    if mask_val[-num] == '1':
+                        is_bold = True
                 except: pass
+
+            if is_bold:
+                styles = ['font-weight: 900; background-color: #f0f2f6;'] * len(row)
+
+            # (C) Error 빨간색 처리 (Bold 유지하면서 색상만 추가)
+            if name == 'error' and raw_val != "0x00":
+                styles[2] = (styles[2] if is_bold else '') + ' color: red; font-weight: 900;'
                 
             return styles
 
-        # 스타일 적용
-        styled_df = df.style.apply(apply_styles, axis=1)
+        # 스타일 적용 및 좌측 인덱스 제거
+        styled_df = df.style.apply(style_rows, axis=1).hide(axis='index')
         
         # 헤더 스타일 설정 (검은 배경, 흰 글씨)
-        header_props = [
-            ('background-color', 'black'),
-            ('color', 'white'),
-            ('font-weight', 'bold'),
-            ('text-align', 'center')
-        ]
-        styled_df.set_table_styles([{'selector': 'th', 'props': header_props}])
+        styled_df.set_table_styles([
+            {'selector': 'th', 'props': [
+                ('background-color', 'black'),
+                ('color', 'white'),
+                ('font-weight', 'bold'),
+                ('text-align', 'center'),
+                ('border', '1px solid white')
+            ]},
+            {'selector': 'td', 'props': [('border', '1px solid #dee2e6')]}
+        ])
         
         return styled_df
 
@@ -103,5 +114,5 @@ if raw_input:
     styled_df = parse_ble_packet(raw_input)
     if styled_df is not None:
         st.write("### 📊 분석 결과")
-        # st.table 대신 st.dataframe 또는 st.write(styled_df) 사용
-        st.table(styled_df)
+        # HTML로 렌더링하여 스타일 보장
+        st.write(styled_df.to_html(escape=False), unsafe_allow_html=True)
