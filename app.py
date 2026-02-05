@@ -5,15 +5,14 @@ import struct
 # --- UI 설정 ---
 st.set_page_config(page_title="신형 센서 분석기", layout="wide")
 
-# 상단 여백 및 타이틀 간격 최소화 CSS
+# 상단 여백 원상복구 및 타이틀 간격 조정
 st.markdown("""
     <style>
-        /* 메인 콘텐츠 상단 패딩을 기본값의 절반 이하인 0.5rem으로 설정 */
+        /* padding-top을 제거하여 상단 여백을 기본값으로 복구 */
         .block-container {
-            padding-top: 0.5rem;
             padding-bottom: 0rem;
         }
-        /* 제목과 입력창 사이의 간격도 미세하게 조정 */
+        /* 제목 하단 간격은 컴팩트하게 유지 */
         h3 {
             margin-top: 0rem;
             margin-bottom: 0.5rem;
@@ -26,6 +25,7 @@ def parse_ble_packet(hex_str):
         clean_hex = hex_str.lower().replace("0x", "").replace(" ", "").replace("\n", "")
         data = bytes.fromhex(clean_hex)
         
+        # 모델 정보 및 단위 정의
         model_info = {
             0x10: ("ARX.AT115", "mmH2O"), 0x11: ("ARX.AT116", "mmH2O"),
             0x20: ("ARX.AT125", "mmH2O"), 0x21: ("ARX.AT126", "mmH2O"),
