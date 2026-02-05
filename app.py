@@ -5,7 +5,7 @@ import struct
 # --- UI 설정 ---
 st.set_page_config(page_title="신형 센서 분석기", layout="wide")
 
-# 상단 여백을 기본값의 약 70% 수준으로 조정 (기본 6rem -> 4rem)
+# 상단 여백을 기본값의 약 50% 수준으로 조정 (기본 6rem -> 3rem)
 st.markdown("""
     <style>
         .block-container {
