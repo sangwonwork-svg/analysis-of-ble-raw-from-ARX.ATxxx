@@ -4,11 +4,9 @@ import struct
 
 def parse_ble_packet(hex_str):
     try:
-        # 데이터 정제
         clean_hex = hex_str.lower().replace("0x", "").replace(" ", "").replace("\n", "")
         data = bytes.fromhex(clean_hex)
         
-        # 모델명 및 단위 맵핑
         model_info = {
             0x10: ("ARX.AT115", "mmH2O"), 0x11: ("ARX.AT116", "mmH2O"),
             0x20: ("ARX.AT125", "mmH2O"), 0x21: ("ARX.AT126", "mmH2O"),
@@ -19,11 +17,8 @@ def parse_ble_packet(hex_str):
             0x70: ("ARX.AT445", "mm/s"), 0x71: ("ARX.AT446", "mm/s")
         }
 
-        # 모델 정보 추출
         model_byte = data[5] if len(data) > 5 else 0x00
         m_name, m_unit = model_info.get(model_byte, (f"Unknown(0x{model_byte:02X})", ""))
-
-        # Value Mask 추출 및 안정적인 기본값 설정
         mask_byte = data[10] if len(data) > 10 else 0x00
         mask_str = bin(mask_byte & 0x3F)[2:].zfill(6)
 
@@ -31,7 +26,6 @@ def parse_ble_packet(hex_str):
             if len(b_slice) < 4: return "-"
             val = struct.unpack('<i', b_slice)[0]
             base_val = f"{val / 100:.2f}"
-            # mask_str의 인덱스는 v1이 가장 오른쪽(-1)
             if mask_str[-v_idx] == '1':
                 return f"{base_val} {m_unit}"
             return base_val
@@ -67,45 +61,39 @@ def parse_ble_packet(hex_str):
 
         df = pd.DataFrame(results)
 
-        # 스타일링 함수 보완
         def apply_styles(row):
             styles = [''] * len(row)
             name = row['항목']
             raw_val = row['Raw 값']
-            
             is_bold = False
             if name in ['model', 'battery']:
                 is_bold = True
             elif name.startswith('value '):
                 try:
-                    # 'value 1' -> '1' 추출 안전하게 처리
-                    v_num_str = name.split(' ')[1]
-                    if v_num_str.isdigit():
-                        v_num = int(v_num_str)
-                        if 1 <= v_num <= 6 and mask_str[-v_num] == '1':
-                            is_bold = True
-                except (IndexError, ValueError):
-                    pass
+                    v_num = int(name.split(' ')[1])
+                    if mask_str[-v_num] == '1': is_bold = True
+                except: pass
 
             if is_bold:
-                styles = ['font-weight: 900; background-color: #f0f2f6;'] * len(row)
-            
+                styles = ['font-weight: 900; background-color: #f9f9f9;'] * len(row)
             if name == 'error' and raw_val != "0x00":
                 styles[2] = (styles[2] if is_bold else '') + ' color: red; font-weight: 900;'
-                
             return styles
 
-        # 스타일 적용 및 인덱스 제거
         styled = df.style.apply(apply_styles, axis=1).hide(axis='index')
         
-        # 헤더 스타일 정의
+        # 표 스타일 설정 (선 색상: 짙은 회색 #666666, 높이 30% 증가)
         header_css = [
             {'selector': 'th', 'props': [
                 ('background-color', 'black'), ('color', 'white'), 
                 ('font-weight', 'bold'), ('text-align', 'center'), 
-                ('border', '1px solid white')
+                ('border', '0.5px solid #666666'), ('padding', '12px 15px')
             ]},
-            {'selector': 'td', 'props': [('border', '1px solid #dee2e6')]}
+            {'selector': 'td', 'props': [
+                ('border', '0.5px solid #666666'), 
+                ('padding', '12px 15px'),  # 행 높이를 위해 상하 패딩 증가
+                ('font-size', '14px')
+            ]}
         ]
         styled.set_table_styles(header_css)
         
@@ -115,15 +103,19 @@ def parse_ble_packet(hex_str):
         st.error(f"분석 중 오류 발생: {e}")
         return None
 
-# --- UI Layout ---
+# --- UI ---
 st.set_page_config(page_title="BLE Analyzer", layout="wide")
 st.title("📡 BLE Raw Packet Analyzer")
 
-raw_input = st.text_input("Raw 패킷 입력 (0x...)", placeholder="0x010203040510...")
+raw_input = st.text_input("Raw 패킷 입력 (0x...)", placeholder="0x010203...")
 
 if raw_input:
     styled_df = parse_ble_packet(raw_input)
     if styled_df is not None:
         st.markdown("### 📊 분석 결과")
-        # 가장 안정적인 HTML 출력 방식
-        st.html(styled_df.to_html())
+        # HTML 렌더링 시 테두리 붕괴 방지 스타일 추가
+        table_html = styled_df.to_html()
+        st.markdown(
+            f'<style>table {{ border-collapse: collapse; width: 100%; }}</style>{table_html}', 
+            unsafe_allow_html=True
+        )
